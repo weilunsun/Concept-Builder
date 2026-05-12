@@ -12,6 +12,7 @@ export interface ActiveFilters {
   stopTypes: StopType[];
   categories: Category[];
   sort: SortOption;
+  mine: boolean;
 }
 
 const STOP_TYPES: { value: StopType; label: string; icon: string }[] = [
@@ -44,31 +45,22 @@ interface Props {
   filters: ActiveFilters;
   onChange: (filters: ActiveFilters) => void;
   resultCount: number;
+  showMine?: boolean;
 }
 
-export function FilterChips({ filters, onChange, resultCount }: Props) {
+export function FilterChips({ filters, onChange, resultCount, showMine = false }: Props) {
   const colors = useColors();
 
   async function toggleCategory(cat: Category) {
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     const already = filters.categories.includes(cat);
-    onChange({
-      ...filters,
-      categories: already
-        ? filters.categories.filter(c => c !== cat)
-        : [...filters.categories, cat],
-    });
+    onChange({ ...filters, categories: already ? filters.categories.filter(c => c !== cat) : [...filters.categories, cat] });
   }
 
   async function toggleStopType(type: StopType) {
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     const already = filters.stopTypes.includes(type);
-    onChange({
-      ...filters,
-      stopTypes: already
-        ? filters.stopTypes.filter(t => t !== type)
-        : [...filters.stopTypes, type],
-    });
+    onChange({ ...filters, stopTypes: already ? filters.stopTypes.filter(t => t !== type) : [...filters.stopTypes, type] });
   }
 
   async function setSort(sort: SortOption) {
@@ -76,23 +68,25 @@ export function FilterChips({ filters, onChange, resultCount }: Props) {
     onChange({ ...filters, sort });
   }
 
+  async function toggleMine() {
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    onChange({ ...filters, mine: !filters.mine });
+  }
+
   const hasActiveFilters =
     filters.categories.length > 0 ||
     filters.stopTypes.length > 0 ||
-    filters.sort !== 'newest';
+    filters.sort !== 'newest' ||
+    filters.mine;
 
   async function clearAll() {
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    onChange({ categories: [], stopTypes: [], sort: 'newest' });
+    onChange({ categories: [], stopTypes: [], sort: 'newest', mine: false });
   }
 
   return (
     <View style={styles.wrapper}>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.row}
-      >
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
         {hasActiveFilters && (
           <TouchableOpacity
             style={[styles.chip, { backgroundColor: colors.destructive + '18', borderColor: colors.destructive + '44' }]}
@@ -104,7 +98,25 @@ export function FilterChips({ filters, onChange, resultCount }: Props) {
           </TouchableOpacity>
         )}
 
-        <View style={[styles.separator, { backgroundColor: colors.border }]} />
+        {/* Mine chip — provider only */}
+        {showMine && (
+          <>
+            <TouchableOpacity
+              style={[
+                styles.chip,
+                { backgroundColor: filters.mine ? colors.primary : colors.secondary, borderColor: filters.mine ? colors.primary : colors.border },
+              ]}
+              onPress={toggleMine}
+              activeOpacity={0.75}
+            >
+              <Feather name="bookmark" size={12} color={filters.mine ? '#fff' : colors.primary} />
+              <Text style={[styles.chipText, { color: filters.mine ? '#fff' : colors.primary }]}>Mine</Text>
+            </TouchableOpacity>
+            <View style={[styles.separator, { backgroundColor: colors.border }]} />
+          </>
+        )}
+
+        {!showMine && <View style={[styles.separator, { backgroundColor: colors.border }]} />}
 
         {ALL_CATEGORIES.map(cat => {
           const meta = CATEGORY_META[cat];
@@ -112,10 +124,7 @@ export function FilterChips({ filters, onChange, resultCount }: Props) {
           return (
             <TouchableOpacity
               key={cat}
-              style={[
-                styles.chip,
-                { backgroundColor: active ? meta.color : meta.bg, borderColor: active ? meta.color : meta.color + '55' },
-              ]}
+              style={[styles.chip, { backgroundColor: active ? meta.color : meta.bg, borderColor: active ? meta.color : meta.color + '55' }]}
               onPress={() => toggleCategory(cat)}
               activeOpacity={0.75}
             >
@@ -151,10 +160,7 @@ export function FilterChips({ filters, onChange, resultCount }: Props) {
           return (
             <TouchableOpacity
               key={value}
-              style={[
-                styles.chip,
-                { backgroundColor: active ? colors.primary : colors.secondary, borderColor: active ? colors.primary : colors.border },
-              ]}
+              style={[styles.chip, { backgroundColor: active ? colors.primary : colors.secondary, borderColor: active ? colors.primary : colors.border }]}
               onPress={() => setSort(value)}
               activeOpacity={0.75}
             >
@@ -176,34 +182,9 @@ export function FilterChips({ filters, onChange, resultCount }: Props) {
 
 const styles = StyleSheet.create({
   wrapper: { gap: 8 },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 7,
-    paddingHorizontal: 16,
-    paddingVertical: 2,
-  },
-  chip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 11,
-    paddingVertical: 7,
-    borderRadius: 20,
-    borderWidth: 1,
-  },
-  chipText: {
-    fontSize: 12,
-    fontFamily: 'Inter_500Medium',
-  },
-  separator: {
-    width: 1,
-    height: 20,
-    marginHorizontal: 2,
-  },
-  resultCount: {
-    fontSize: 12,
-    fontFamily: 'Inter_400Regular',
-    paddingHorizontal: 20,
-  },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 16, paddingVertical: 2 },
+  chip: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 11, paddingVertical: 7, borderRadius: 20, borderWidth: 1 },
+  chipText: { fontSize: 12, fontFamily: 'Inter_500Medium' },
+  separator: { width: 1, height: 20, marginHorizontal: 2 },
+  resultCount: { fontSize: 12, fontFamily: 'Inter_400Regular', paddingHorizontal: 20 },
 });

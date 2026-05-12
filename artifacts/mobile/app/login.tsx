@@ -16,6 +16,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@/context/AuthContext';
 import { useColors } from '@/hooks/useColors';
+import { AccountRole } from '@/types/provider';
 
 type Mode = 'signin' | 'register';
 
@@ -30,6 +31,7 @@ export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
+  const [role, setRole] = useState<AccountRole>('user');
   const [showPw, setShowPw] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -41,6 +43,7 @@ export default function LoginScreen() {
     setEmail('');
     setPassword('');
     setConfirm('');
+    setRole('user');
   }
 
   async function handleSubmit() {
@@ -50,7 +53,7 @@ export default function LoginScreen() {
       return;
     }
     if (mode === 'register') {
-      if (!name.trim()) { setError('Provider name is required.'); return; }
+      if (!name.trim()) { setError('Your name is required.'); return; }
       if (password.length < 6) { setError('Password must be at least 6 characters.'); return; }
       if (password !== confirm) { setError('Passwords do not match.'); return; }
     }
@@ -60,7 +63,7 @@ export default function LoginScreen() {
 
     const result = mode === 'signin'
       ? await login(email, password)
-      : await register(name, email, password);
+      : await register(name, email, password, role);
 
     setLoading(false);
 
@@ -73,10 +76,11 @@ export default function LoginScreen() {
     }
   }
 
-  function fillDemo(acct: 'coastal' | 'euro') {
+  function fillDemo(acct: 'coastal' | 'euro' | 'user') {
     setMode('signin');
-    setEmail(acct === 'coastal' ? 'coastal@demo.com' : 'euro@demo.com');
-    setPassword('demo123');
+    if (acct === 'coastal') { setEmail('coastal@demo.com'); setPassword('demo123'); }
+    else if (acct === 'euro') { setEmail('euro@demo.com'); setPassword('demo123'); }
+    else { setEmail('alex@demo.com'); setPassword('demo123'); }
     setError('');
   }
 
@@ -87,15 +91,13 @@ export default function LoginScreen() {
       style={[styles.screen, { backgroundColor: colors.primary }]}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      {/* Hero top */}
+      {/* Hero */}
       <View style={[styles.hero, { paddingTop: topPad + 24 }]}>
-        <View style={styles.logoWrap}>
-          <View style={[styles.logoCircle, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
-            <Feather name="map" size={34} color="#fff" />
-          </View>
+        <View style={[styles.logoCircle, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
+          <Feather name="map" size={34} color="#fff" />
         </View>
-        <Text style={styles.heroTitle}>Provider Portal</Text>
-        <Text style={styles.heroSubtitle}>Manage and publish your itineraries</Text>
+        <Text style={styles.heroTitle}>Itinerary Manager</Text>
+        <Text style={styles.heroSubtitle}>Sign in to browse or manage trips</Text>
       </View>
 
       {/* Card */}
@@ -127,12 +129,12 @@ export default function LoginScreen() {
         <View style={styles.form}>
           {mode === 'register' && (
             <View style={styles.field}>
-              <Text style={[styles.label, { color: colors.mutedForeground }]}>Provider Name</Text>
+              <Text style={[styles.label, { color: colors.mutedForeground }]}>Your Name</Text>
               <TextInput
                 style={[styles.input, { borderColor: colors.border, color: colors.foreground, backgroundColor: colors.card }]}
                 value={name}
                 onChangeText={setName}
-                placeholder="e.g. Coastal Adventures"
+                placeholder="e.g. Alex Chen"
                 placeholderTextColor={colors.mutedForeground}
                 returnKeyType="next"
                 autoCapitalize="words"
@@ -175,19 +177,58 @@ export default function LoginScreen() {
           </View>
 
           {mode === 'register' && (
-            <View style={styles.field}>
-              <Text style={[styles.label, { color: colors.mutedForeground }]}>Confirm Password</Text>
-              <TextInput
-                style={[styles.input, { borderColor: colors.border, color: colors.foreground, backgroundColor: colors.card }]}
-                value={confirm}
-                onChangeText={setConfirm}
-                placeholder="Re-enter password"
-                placeholderTextColor={colors.mutedForeground}
-                secureTextEntry={!showPw}
-                returnKeyType="done"
-                onSubmitEditing={handleSubmit}
-              />
-            </View>
+            <>
+              <View style={styles.field}>
+                <Text style={[styles.label, { color: colors.mutedForeground }]}>Confirm Password</Text>
+                <TextInput
+                  style={[styles.input, { borderColor: colors.border, color: colors.foreground, backgroundColor: colors.card }]}
+                  value={confirm}
+                  onChangeText={setConfirm}
+                  placeholder="Re-enter password"
+                  placeholderTextColor={colors.mutedForeground}
+                  secureTextEntry={!showPw}
+                  returnKeyType="done"
+                />
+              </View>
+
+              {/* Role selector */}
+              <View style={styles.field}>
+                <Text style={[styles.label, { color: colors.mutedForeground }]}>Account Type</Text>
+                <View style={[styles.rolePicker, { backgroundColor: colors.muted, borderColor: colors.border }]}>
+                  <TouchableOpacity
+                    style={[styles.roleOption, role === 'user' && { backgroundColor: colors.card }]}
+                    onPress={() => setRole('user')}
+                    activeOpacity={0.8}
+                  >
+                    <View style={[styles.roleIconWrap, { backgroundColor: role === 'user' ? colors.secondary : 'transparent' }]}>
+                      <Feather name="user" size={16} color={role === 'user' ? colors.primary : colors.mutedForeground} />
+                    </View>
+                    <View style={styles.roleTextWrap}>
+                      <Text style={[styles.roleTitle, { color: role === 'user' ? colors.foreground : colors.mutedForeground }]}>User</Text>
+                      <Text style={[styles.roleDesc, { color: colors.mutedForeground }]}>Browse & search</Text>
+                    </View>
+                    {role === 'user' && <Feather name="check-circle" size={16} color={colors.primary} />}
+                  </TouchableOpacity>
+
+                  <View style={[styles.roleDiv, { backgroundColor: colors.border }]} />
+
+                  <TouchableOpacity
+                    style={[styles.roleOption, role === 'provider' && { backgroundColor: colors.card }]}
+                    onPress={() => setRole('provider')}
+                    activeOpacity={0.8}
+                  >
+                    <View style={[styles.roleIconWrap, { backgroundColor: role === 'provider' ? colors.secondary : 'transparent' }]}>
+                      <Feather name="shield" size={16} color={role === 'provider' ? colors.primary : colors.mutedForeground} />
+                    </View>
+                    <View style={styles.roleTextWrap}>
+                      <Text style={[styles.roleTitle, { color: role === 'provider' ? colors.foreground : colors.mutedForeground }]}>Provider</Text>
+                      <Text style={[styles.roleDesc, { color: colors.mutedForeground }]}>Create & manage trips</Text>
+                    </View>
+                    {role === 'provider' && <Feather name="check-circle" size={16} color={colors.primary} />}
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </>
           )}
 
           {error.length > 0 && (
@@ -210,20 +251,39 @@ export default function LoginScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Demo hint */}
+        {/* Demo accounts */}
         <View style={[styles.demoBox, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
-          <Text style={[styles.demoTitle, { color: colors.primary }]}>Demo Accounts</Text>
-          <View style={styles.demoRow}>
-            <TouchableOpacity style={[styles.demoBtn, { borderColor: colors.border, backgroundColor: colors.card }]} onPress={() => fillDemo('coastal')} activeOpacity={0.8}>
-              <Text style={[styles.demoBtnName, { color: colors.foreground }]}>Coastal Adventures</Text>
-              <Text style={[styles.demoBtnEmail, { color: colors.mutedForeground }]}>coastal@demo.com</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.demoBtn, { borderColor: colors.border, backgroundColor: colors.card }]} onPress={() => fillDemo('euro')} activeOpacity={0.8}>
-              <Text style={[styles.demoBtnName, { color: colors.foreground }]}>Euro Travel Co</Text>
-              <Text style={[styles.demoBtnEmail, { color: colors.mutedForeground }]}>euro@demo.com</Text>
+          <Text style={[styles.demoTitle, { color: colors.primary }]}>Demo Accounts  ·  tap to auto-fill</Text>
+
+          <View style={styles.demoSection}>
+            <View style={[styles.demoRoleTag, { backgroundColor: colors.primary + '18' }]}>
+              <Feather name="shield" size={11} color={colors.primary} />
+              <Text style={[styles.demoRoleLabel, { color: colors.primary }]}>Providers</Text>
+            </View>
+            <View style={styles.demoRow}>
+              <TouchableOpacity style={[styles.demoBtn, { borderColor: colors.border, backgroundColor: colors.card }]} onPress={() => fillDemo('coastal')} activeOpacity={0.8}>
+                <Text style={[styles.demoBtnName, { color: colors.foreground }]}>Coastal Adventures</Text>
+                <Text style={[styles.demoBtnEmail, { color: colors.mutedForeground }]}>coastal@demo.com</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.demoBtn, { borderColor: colors.border, backgroundColor: colors.card }]} onPress={() => fillDemo('euro')} activeOpacity={0.8}>
+                <Text style={[styles.demoBtnName, { color: colors.foreground }]}>Euro Travel Co</Text>
+                <Text style={[styles.demoBtnEmail, { color: colors.mutedForeground }]}>euro@demo.com</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          <View style={styles.demoSection}>
+            <View style={[styles.demoRoleTag, { backgroundColor: colors.muted }]}>
+              <Feather name="user" size={11} color={colors.mutedForeground} />
+              <Text style={[styles.demoRoleLabel, { color: colors.mutedForeground }]}>User</Text>
+            </View>
+            <TouchableOpacity style={[styles.demoBtn, { borderColor: colors.border, backgroundColor: colors.card, flexGrow: 0 }]} onPress={() => fillDemo('user')} activeOpacity={0.8}>
+              <Text style={[styles.demoBtnName, { color: colors.foreground }]}>Alex Chen</Text>
+              <Text style={[styles.demoBtnEmail, { color: colors.mutedForeground }]}>alex@demo.com</Text>
             </TouchableOpacity>
           </View>
-          <Text style={[styles.demoPassword, { color: colors.mutedForeground }]}>Password: demo123 · tap to auto-fill</Text>
+
+          <Text style={[styles.demoPassword, { color: colors.mutedForeground }]}>All passwords: demo123</Text>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -238,13 +298,13 @@ const styles = StyleSheet.create({
     paddingBottom: 32,
     gap: 10,
   },
-  logoWrap: { marginBottom: 4 },
   logoCircle: {
     width: 72,
     height: 72,
     borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
+    marginBottom: 4,
   },
   heroTitle: {
     fontSize: 28,
@@ -307,6 +367,28 @@ const styles = StyleSheet.create({
     bottom: 0,
     justifyContent: 'center',
   },
+  rolePicker: {
+    borderRadius: 14,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  roleOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 14,
+  },
+  roleIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  roleTextWrap: { flex: 1, gap: 2 },
+  roleTitle: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
+  roleDesc: { fontSize: 12, fontFamily: 'Inter_400Regular' },
+  roleDiv: { height: 1 },
   errorBox: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -335,13 +417,27 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     borderWidth: 1,
     padding: 14,
-    gap: 10,
+    gap: 12,
   },
   demoTitle: {
     fontSize: 12,
     fontFamily: 'Inter_600SemiBold',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
+  },
+  demoSection: { gap: 8 },
+  demoRoleTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    alignSelf: 'flex-start',
+    paddingHorizontal: 9,
+    paddingVertical: 3,
+    borderRadius: 20,
+  },
+  demoRoleLabel: {
+    fontSize: 11,
+    fontFamily: 'Inter_500Medium',
   },
   demoRow: { flexDirection: 'row', gap: 10 },
   demoBtn: {

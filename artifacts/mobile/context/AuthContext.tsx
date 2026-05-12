@@ -1,24 +1,25 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { ReactNode, createContext, useContext, useEffect, useState } from 'react';
-import { Provider } from '@/types/provider';
+import { AccountRole, Provider } from '@/types/provider';
 
 const PROVIDERS_KEY = '@providers_v1';
 const SESSION_KEY = '@session_v1';
 
 function genId() {
-  return 'prov-' + Date.now().toString() + Math.random().toString(36).substr(2, 6);
+  return 'acc-' + Date.now().toString() + Math.random().toString(36).substr(2, 6);
 }
 
 const SEED_PROVIDERS: Provider[] = [
-  { id: 'prov-001', name: 'Coastal Adventures', email: 'coastal@demo.com', password: 'demo123', createdAt: Date.now() - 86400000 * 10 },
-  { id: 'prov-002', name: 'Euro Travel Co',     email: 'euro@demo.com',    password: 'demo123', createdAt: Date.now() - 86400000 * 5 },
+  { id: 'prov-001', name: 'Coastal Adventures', email: 'coastal@demo.com', password: 'demo123', role: 'provider', createdAt: Date.now() - 86400000 * 10 },
+  { id: 'prov-002', name: 'Euro Travel Co',     email: 'euro@demo.com',    password: 'demo123', role: 'provider', createdAt: Date.now() - 86400000 * 5 },
+  { id: 'user-001', name: 'Alex Chen',           email: 'alex@demo.com',    password: 'demo123', role: 'user',     createdAt: Date.now() - 86400000 * 2 },
 ];
 
 interface AuthContextType {
   provider: Provider | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<{ error?: string }>;
-  register: (name: string, email: string, password: string) => Promise<{ error?: string }>;
+  register: (name: string, email: string, password: string, role: AccountRole) => Promise<{ error?: string }>;
   logout: () => Promise<void>;
   allProviders: Provider[];
 }
@@ -34,8 +35,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     (async () => {
       try {
         const storedProviders = await AsyncStorage.getItem(PROVIDERS_KEY);
-        const providers: Provider[] = storedProviders ? JSON.parse(storedProviders) : SEED_PROVIDERS;
+        let providers: Provider[] = storedProviders ? JSON.parse(storedProviders) : SEED_PROVIDERS;
+        // Migrate legacy records missing role
+        providers = providers.map(p => ({ ...p, role: p.role ?? 'provider' }));
         if (!storedProviders) await AsyncStorage.setItem(PROVIDERS_KEY, JSON.stringify(SEED_PROVIDERS));
+        else await AsyncStorage.setItem(PROVIDERS_KEY, JSON.stringify(providers));
         setAllProviders(providers);
 
         const session = await AsyncStorage.getItem(SESSION_KEY);
@@ -62,13 +66,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return {};
   }
 
-  async function register(name: string, email: string, password: string): Promise<{ error?: string }> {
+  async function register(name: string, email: string, password: string, role: AccountRole): Promise<{ error?: string }> {
     const storedRaw = await AsyncStorage.getItem(PROVIDERS_KEY);
     const providers: Provider[] = storedRaw ? JSON.parse(storedRaw) : SEED_PROVIDERS;
     if (providers.find(p => p.email.toLowerCase() === email.trim().toLowerCase())) {
       return { error: 'An account with this email already exists.' };
     }
-    const newProvider: Provider = { id: genId(), name: name.trim(), email: email.trim().toLowerCase(), password, createdAt: Date.now() };
+    const newProvider: Provider = { id: genId(), name: name.trim(), email: email.trim().toLowerCase(), password, role, createdAt: Date.now() };
     const updated = [...providers, newProvider];
     await AsyncStorage.setItem(PROVIDERS_KEY, JSON.stringify(updated));
     await AsyncStorage.setItem(SESSION_KEY, JSON.stringify({ providerId: newProvider.id }));
