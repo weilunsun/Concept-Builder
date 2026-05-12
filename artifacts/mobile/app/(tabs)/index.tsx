@@ -13,8 +13,10 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ActiveFilters, FilterChips } from '@/components/FilterChips';
+import { HamburgerMenu } from '@/components/HamburgerMenu';
 import { ItineraryCard } from '@/components/ItineraryCard';
 import { SearchBar } from '@/components/SearchBar';
+import { useAuth } from '@/context/AuthContext';
 import { useItineraries } from '@/context/ItineraryContext';
 import { useColors } from '@/hooks/useColors';
 import { Itinerary } from '@/types/itinerary';
@@ -30,11 +32,10 @@ function applyFiltersAndSort(list: Itinerary[], query: string, filters: ActiveFi
 
   if (query.trim()) {
     const q = query.trim().toLowerCase();
-    result = result.filter(
-      it =>
-        it.title.toLowerCase().includes(q) ||
-        it.summary.toLowerCase().includes(q) ||
-        it.details.toLowerCase().includes(q),
+    result = result.filter(it =>
+      it.title.toLowerCase().includes(q) ||
+      it.summary.toLowerCase().includes(q) ||
+      it.details.toLowerCase().includes(q),
     );
   }
 
@@ -66,6 +67,7 @@ export default function ItineraryListScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { itineraries, loading } = useItineraries();
+  const { provider } = useAuth();
 
   const [query, setQuery] = useState('');
   const [filters, setFilters] = useState<ActiveFilters>(DEFAULT_FILTERS);
@@ -91,7 +93,8 @@ export default function ItineraryListScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { paddingTop: topPad + 16, backgroundColor: colors.background }]}>
-        <View>
+        <HamburgerMenu />
+        <View style={styles.headerCenter}>
           <Text style={[styles.heading, { color: colors.foreground }]}>Itineraries</Text>
           <Text style={[styles.subheading, { color: colors.mutedForeground }]}>
             {itineraries.length} trip{itineraries.length !== 1 ? 's' : ''}
@@ -128,7 +131,7 @@ export default function ItineraryListScreen() {
           <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
             {isFiltering
               ? 'Try adjusting your search or removing filters'
-              : 'Tap the + button to create your first trip'}
+              : 'Tap + to create your first trip'}
           </Text>
           {isFiltering && (
             <TouchableOpacity
@@ -163,19 +166,23 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   header: {
     flexDirection: 'row',
-    alignItems: 'flex-end',
+    alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingBottom: 14,
+    gap: 12,
+  },
+  headerCenter: {
+    flex: 1,
   },
   heading: {
-    fontSize: 30,
+    fontSize: 26,
     fontFamily: 'Inter_700Bold',
   },
   subheading: {
-    fontSize: 14,
+    fontSize: 13,
     fontFamily: 'Inter_400Regular',
-    marginTop: 2,
+    marginTop: 1,
   },
   fab: {
     width: 46,
@@ -198,10 +205,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 10,
   },
-  list: {
-    padding: 16,
-    paddingTop: 16,
-  },
+  list: { padding: 16, paddingTop: 16 },
   center: {
     flex: 1,
     alignItems: 'center',

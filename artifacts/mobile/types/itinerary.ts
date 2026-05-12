@@ -30,6 +30,7 @@ export interface AddOn {
 
 export interface Itinerary {
   id: string;
+  providerId: string;
   title: string;
   summary: string;
   details: string;

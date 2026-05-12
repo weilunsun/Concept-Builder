@@ -16,6 +16,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PictureGallery } from '@/components/PictureGallery';
 import { PricingSection } from '@/components/PricingSection';
 import { EditableStopCard } from '@/components/StopCard';
+import { useAuth } from '@/context/AuthContext';
 import { useItineraries } from '@/context/ItineraryContext';
 import { useColors } from '@/hooks/useColors';
 import { AddOn, Category, ItinerarySegment, Transit } from '@/types/itinerary';
@@ -39,9 +40,25 @@ export default function CreateScreen() {
   const insets = useSafeAreaInsets();
   const { editId } = useLocalSearchParams<{ editId?: string }>();
   const { addItinerary, updateItinerary, getItinerary } = useItineraries();
+  const { provider } = useAuth();
 
   const isEdit = !!editId;
   const existing = editId ? getItinerary(editId) : undefined;
+
+  // Guard: non-owners cannot edit
+  if (isEdit && existing && provider && existing.providerId !== provider.id) {
+    return (
+      <View style={[styles.screen, styles.center, { backgroundColor: colors.background }]}>
+        <Feather name="lock" size={40} color={colors.mutedForeground} />
+        <Text style={[styles.guardText, { color: colors.mutedForeground }]}>
+          You can only edit your own itineraries.
+        </Text>
+        <TouchableOpacity onPress={() => router.back()}>
+          <Text style={[styles.guardBack, { color: colors.primary }]}>Go back</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   const [title, setTitle] = useState(existing?.title ?? '');
   const [summary, setSummary] = useState(existing?.summary ?? '');
@@ -58,9 +75,7 @@ export default function CreateScreen() {
   const topPad = Platform.OS === 'web' ? Math.max(insets.top, 67) : insets.top;
 
   function toggleCategory(cat: Category) {
-    setCategories(prev =>
-      prev.includes(cat) ? prev.filter(c => c !== cat) : [...prev, cat],
-    );
+    setCategories(prev => prev.includes(cat) ? prev.filter(c => c !== cat) : [...prev, cat]);
   }
 
   function updateSegment(i: number, updated: ItinerarySegment) {
@@ -94,23 +109,16 @@ export default function CreateScreen() {
   }
 
   async function handleSave() {
-    if (!title.trim()) {
-      Alert.alert('Title required', 'Please enter a title for your itinerary.');
-      return;
-    }
-    if (!summary.trim()) {
-      Alert.alert('Summary required', 'Please enter a short summary.');
-      return;
-    }
-    if (categories.length === 0) {
-      Alert.alert('Category required', 'Please select at least one category.');
-      return;
-    }
+    if (!title.trim()) { Alert.alert('Title required', 'Please enter a title.'); return; }
+    if (!summary.trim()) { Alert.alert('Summary required', 'Please enter a short summary.'); return; }
+    if (categories.length === 0) { Alert.alert('Category required', 'Select at least one category.'); return; }
+    if (!provider) { Alert.alert('Not signed in', 'Please sign in to save.'); return; }
 
     setSaving(true);
     await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
     const data = {
+      providerId: existing?.providerId ?? provider.id,
       title: title.trim(),
       summary: summary.trim(),
       details: details.trim(),
@@ -139,9 +147,16 @@ export default function CreateScreen() {
         <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
           <Feather name="x" size={22} color={colors.foreground} />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.foreground }]}>
-          {isEdit ? 'Edit Itinerary' : 'New Itinerary'}
-        </Text>
+        <View style={styles.headerMid}>
+          <Text style={[styles.headerTitle, { color: colors.foreground }]}>
+            {isEdit ? 'Edit Itinerary' : 'New Itinerary'}
+          </Text>
+          {provider && (
+            <Text style={[styles.headerProvider, { color: colors.mutedForeground }]}>
+              {provider.name}
+            </Text>
+          )}
+        </View>
         <TouchableOpacity
           style={[styles.saveBtn, { backgroundColor: saving ? colors.muted : colors.primary }]}
           onPress={handleSave}
@@ -221,10 +236,7 @@ export default function CreateScreen() {
                   key={cat}
                   style={[
                     styles.categoryTile,
-                    {
-                      backgroundColor: active ? meta.color + '18' : colors.muted,
-                      borderColor: active ? meta.color : colors.border,
-                    },
+                    { backgroundColor: active ? meta.color + '18' : colors.muted, borderColor: active ? meta.color : colors.border },
                   ]}
                   onPress={() => toggleCategory(cat)}
                   activeOpacity={0.8}
@@ -301,6 +313,9 @@ export default function CreateScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
+  center: { alignItems: 'center', justifyContent: 'center', gap: 14, padding: 40 },
+  guardText: { fontSize: 15, fontFamily: 'Inter_400Regular', textAlign: 'center' },
+  guardBack: { fontSize: 15, fontFamily: 'Inter_600SemiBold' },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -309,24 +324,17 @@ const styles = StyleSheet.create({
     paddingBottom: 14,
     borderBottomWidth: 1,
   },
-  headerTitle: {
-    fontSize: 17,
-    fontFamily: 'Inter_600SemiBold',
-  },
+  headerMid: { flex: 1, alignItems: 'center', gap: 2 },
+  headerTitle: { fontSize: 16, fontFamily: 'Inter_600SemiBold' },
+  headerProvider: { fontSize: 12, fontFamily: 'Inter_400Regular' },
   saveBtn: {
     paddingHorizontal: 18,
     paddingVertical: 9,
     borderRadius: 10,
   },
-  saveBtnText: {
-    fontSize: 14,
-    fontFamily: 'Inter_600SemiBold',
-  },
+  saveBtnText: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
   scroll: { flex: 1 },
-  content: {
-    padding: 16,
-    gap: 20,
-  },
+  content: { padding: 16, gap: 20 },
   section: { gap: 10 },
   sectionHeaderRow: {
     flexDirection: 'row',
@@ -340,19 +348,9 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 0.6,
   },
-  requiredHint: {
-    fontSize: 12,
-    fontFamily: 'Inter_400Regular',
-  },
-  card: {
-    borderRadius: 14,
-    borderWidth: 1,
-    overflow: 'hidden',
-  },
-  field: {
-    padding: 14,
-    gap: 8,
-  },
+  requiredHint: { fontSize: 12, fontFamily: 'Inter_400Regular' },
+  card: { borderRadius: 14, borderWidth: 1, overflow: 'hidden' },
+  field: { padding: 14, gap: 8 },
   fieldLabel: {
     fontSize: 12,
     fontFamily: 'Inter_500Medium',
@@ -367,10 +365,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontFamily: 'Inter_400Regular',
   },
-  multiline: {
-    minHeight: 80,
-    textAlignVertical: 'top',
-  },
+  multiline: { minHeight: 80, textAlignVertical: 'top' },
   divider: { height: 1 },
   categoryGrid: {
     flexDirection: 'row',
@@ -396,11 +391,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  catTileLabel: {
-    fontSize: 12,
-    fontFamily: 'Inter_600SemiBold',
-    textAlign: 'center',
-  },
+  catTileLabel: { fontSize: 12, fontFamily: 'Inter_600SemiBold', textAlign: 'center' },
   checkMark: {
     position: 'absolute',
     top: 6,
@@ -422,8 +413,5 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderStyle: 'dashed',
   },
-  addStopText: {
-    fontSize: 15,
-    fontFamily: 'Inter_600SemiBold',
-  },
+  addStopText: { fontSize: 15, fontFamily: 'Inter_600SemiBold' },
 });

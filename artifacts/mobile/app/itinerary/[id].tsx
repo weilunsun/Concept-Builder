@@ -2,10 +2,9 @@ import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import React from 'react';
 import {
   Alert,
-  Dimensions,
   Platform,
   ScrollView,
   StyleSheet,
@@ -19,11 +18,10 @@ import { PictureGallery } from '@/components/PictureGallery';
 import { PricingSection } from '@/components/PricingSection';
 import { ReviewBar } from '@/components/ReviewBar';
 import { ReadOnlyStopCard } from '@/components/StopCard';
+import { useAuth } from '@/context/AuthContext';
 import { useItineraries } from '@/context/ItineraryContext';
 import { useColors } from '@/hooks/useColors';
 import { CATEGORY_META } from '@/utils/categories';
-
-const { width } = Dimensions.get('window');
 
 export default function ItineraryDetailScreen() {
   const colors = useColors();
@@ -31,8 +29,10 @@ export default function ItineraryDetailScreen() {
   const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { getItinerary, voteItinerary, deleteItinerary } = useItineraries();
+  const { provider } = useAuth();
 
   const itinerary = getItinerary(id);
+  const isOwner = !!provider && !!itinerary && itinerary.providerId === provider.id;
 
   if (!itinerary) {
     return (
@@ -70,8 +70,10 @@ export default function ItineraryDetailScreen() {
   }
 
   const topPad = Platform.OS === 'web' ? Math.max(insets.top, 67) : insets.top;
-
   const hasHeroPic = itinerary.pictures.length > 0;
+
+  // Find provider name for badge
+  const ownerBadge = isOwner ? 'You' : undefined;
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
@@ -82,14 +84,16 @@ export default function ItineraryDetailScreen() {
             <TouchableOpacity style={styles.navBtn} onPress={() => router.back()} activeOpacity={0.8}>
               <Feather name="arrow-left" size={20} color="#fff" />
             </TouchableOpacity>
-            <View style={styles.heroActions}>
-              <TouchableOpacity style={styles.navBtn} onPress={handleEdit} activeOpacity={0.8}>
-                <Feather name="edit-2" size={18} color="#fff" />
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.navBtn} onPress={handleDelete} activeOpacity={0.8}>
-                <Feather name="trash-2" size={18} color="#fff" />
-              </TouchableOpacity>
-            </View>
+            {isOwner && (
+              <View style={styles.heroActions}>
+                <TouchableOpacity style={styles.navBtn} onPress={handleEdit} activeOpacity={0.8}>
+                  <Feather name="edit-2" size={18} color="#fff" />
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.navBtn} onPress={handleDelete} activeOpacity={0.8}>
+                  <Feather name="trash-2" size={18} color="#fff" />
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
         </View>
       ) : (
@@ -97,14 +101,16 @@ export default function ItineraryDetailScreen() {
           <TouchableOpacity style={[styles.iconBtn, { backgroundColor: colors.secondary }]} onPress={() => router.back()} activeOpacity={0.8}>
             <Feather name="arrow-left" size={20} color={colors.foreground} />
           </TouchableOpacity>
-          <View style={styles.heroActions}>
-            <TouchableOpacity style={[styles.iconBtn, { backgroundColor: colors.secondary }]} onPress={handleEdit} activeOpacity={0.8}>
-              <Feather name="edit-2" size={18} color={colors.foreground} />
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.iconBtn, { backgroundColor: colors.secondary }]} onPress={handleDelete} activeOpacity={0.8}>
-              <Feather name="trash-2" size={18} color={colors.destructive} />
-            </TouchableOpacity>
-          </View>
+          {isOwner && (
+            <View style={styles.heroActions}>
+              <TouchableOpacity style={[styles.iconBtn, { backgroundColor: colors.secondary }]} onPress={handleEdit} activeOpacity={0.8}>
+                <Feather name="edit-2" size={18} color={colors.foreground} />
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.iconBtn, { backgroundColor: colors.secondary }]} onPress={handleDelete} activeOpacity={0.8}>
+                <Feather name="trash-2" size={18} color={colors.destructive} />
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
       )}
 
@@ -116,24 +122,35 @@ export default function ItineraryDetailScreen() {
         ]}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.titleRow}>
-          <View style={styles.titleBlock}>
+        <View style={styles.titleBlock}>
+          <View style={styles.titleTopRow}>
             <Text style={[styles.idBadge, { color: colors.mutedForeground }]}>#{itinerary.id.slice(-6).toUpperCase()}</Text>
-            <Text style={[styles.title, { color: colors.foreground }]}>{itinerary.title}</Text>
-            {(itinerary.categories ?? []).length > 0 && (
-              <View style={styles.categoryRow}>
-                {(itinerary.categories ?? []).map(cat => {
-                  const meta = CATEGORY_META[cat];
-                  return (
-                    <View key={cat} style={[styles.catBadge, { backgroundColor: meta.bg, borderColor: meta.color + '55' }]}>
-                      <Feather name={meta.icon as any} size={12} color={meta.color} />
-                      <Text style={[styles.catText, { color: meta.color }]}>{meta.label}</Text>
-                    </View>
-                  );
-                })}
+            {isOwner ? (
+              <View style={[styles.ownerBadge, { backgroundColor: colors.primary + '18', borderColor: colors.primary + '44' }]}>
+                <Feather name="shield" size={11} color={colors.primary} />
+                <Text style={[styles.ownerBadgeText, { color: colors.primary }]}>Your listing</Text>
+              </View>
+            ) : (
+              <View style={[styles.ownerBadge, { backgroundColor: colors.muted, borderColor: colors.border }]}>
+                <Feather name="user" size={11} color={colors.mutedForeground} />
+                <Text style={[styles.ownerBadgeText, { color: colors.mutedForeground }]}>View only</Text>
               </View>
             )}
           </View>
+          <Text style={[styles.title, { color: colors.foreground }]}>{itinerary.title}</Text>
+          {(itinerary.categories ?? []).length > 0 && (
+            <View style={styles.categoryRow}>
+              {(itinerary.categories ?? []).map(cat => {
+                const meta = CATEGORY_META[cat];
+                return (
+                  <View key={cat} style={[styles.catBadge, { backgroundColor: meta.bg, borderColor: meta.color + '55' }]}>
+                    <Feather name={meta.icon as any} size={12} color={meta.color} />
+                    <Text style={[styles.catText, { color: meta.color }]}>{meta.label}</Text>
+                  </View>
+                );
+              })}
+            </View>
+          )}
         </View>
 
         <ExpandableSummary summary={itinerary.summary} details={itinerary.details} />
@@ -175,28 +192,17 @@ export default function ItineraryDetailScreen() {
 }
 
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-  },
-  heroContainer: {
-    position: 'relative',
-    height: 260,
-  },
-  hero: {
-    width: '100%',
-    height: '100%',
-  },
+  screen: { flex: 1 },
+  heroContainer: { position: 'relative', height: 260 },
+  hero: { width: '100%', height: '100%' },
   heroOverlay: {
     position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
+    top: 0, left: 0, right: 0,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingBottom: 12,
-    background: 'linear-gradient(to bottom, rgba(0,0,0,0.4), transparent)',
   },
   noHeroBar: {
     flexDirection: 'row',
@@ -221,30 +227,32 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  heroActions: {
+  heroActions: { flexDirection: 'row', gap: 8 },
+  scroll: { flex: 1 },
+  content: { padding: 16, gap: 14 },
+  titleBlock: { gap: 5 },
+  titleTopRow: {
     flexDirection: 'row',
-    gap: 8,
-  },
-  scroll: {
-    flex: 1,
-  },
-  content: {
-    padding: 16,
-    gap: 14,
-  },
-  titleRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     justifyContent: 'space-between',
-  },
-  titleBlock: {
-    flex: 1,
-    gap: 4,
   },
   idBadge: {
     fontSize: 12,
     fontFamily: 'Inter_500Medium',
     letterSpacing: 1,
+  },
+  ownerBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 9,
+    paddingVertical: 3,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  ownerBadgeText: {
+    fontSize: 11,
+    fontFamily: 'Inter_500Medium',
   },
   title: {
     fontSize: 26,
@@ -270,9 +278,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: 'Inter_500Medium',
   },
-  section: {
-    gap: 10,
-  },
+  section: { gap: 10 },
   sectionTitle: {
     fontSize: 13,
     fontFamily: 'Inter_500Medium',

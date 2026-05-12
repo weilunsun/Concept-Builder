@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { ReactNode, createContext, useContext, useEffect, useState } from 'react';
 import { Itinerary } from '@/types/itinerary';
 
-const STORAGE_KEY = '@itineraries_v2';
+const STORAGE_KEY = '@itineraries_v3';
 
 function genId(): string {
   return Date.now().toString() + Math.random().toString(36).substr(2, 9);
@@ -11,6 +11,7 @@ function genId(): string {
 const SAMPLES: Itinerary[] = [
   {
     id: 'it-001',
+    providerId: 'prov-001',
     title: 'Coastal Road Trip',
     summary: 'A scenic drive along the California coast with stops at iconic landmarks and hidden coves.',
     details: 'This 3-day adventure takes you from San Francisco to Los Angeles along Highway 1. Experience dramatic cliff views, charming seaside towns, whale watching, and unforgettable Pacific sunsets. Best done in spring or fall to avoid crowds. Pack layers — coastal weather changes fast.',
@@ -41,6 +42,7 @@ const SAMPLES: Itinerary[] = [
   },
   {
     id: 'it-002',
+    providerId: 'prov-002',
     title: 'European City Break',
     summary: 'Five days exploring the highlights of Paris and Amsterdam with expert-curated stops.',
     details: 'A carefully crafted journey through two of Europe\'s most beloved cities. From the Eiffel Tower to the Anne Frank House, this itinerary balances iconic landmarks with local neighborhoods, exceptional cuisine, and cultural depth. Designed for first-timers and repeat visitors alike.',
@@ -92,8 +94,15 @@ export function ItineraryProvider({ children }: { children: ReactNode }) {
     (async () => {
       try {
         const stored = await AsyncStorage.getItem(STORAGE_KEY);
-        setItineraries(stored ? JSON.parse(stored) : SAMPLES);
-        if (!stored) await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(SAMPLES));
+        if (stored) {
+          const parsed: Itinerary[] = JSON.parse(stored);
+          // Migrate any records missing providerId
+          const migrated = parsed.map(it => ({ ...it, providerId: it.providerId ?? 'prov-001' }));
+          setItineraries(migrated);
+        } else {
+          setItineraries(SAMPLES);
+          await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(SAMPLES));
+        }
       } catch {
         setItineraries(SAMPLES);
       } finally {
