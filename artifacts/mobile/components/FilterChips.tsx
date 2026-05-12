@@ -3,12 +3,14 @@ import * as Haptics from 'expo-haptics';
 import React from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useColors } from '@/hooks/useColors';
-import { StopType } from '@/types/itinerary';
+import { Category, StopType } from '@/types/itinerary';
+import { ALL_CATEGORIES, CATEGORY_META } from '@/utils/categories';
 
 export type SortOption = 'newest' | 'oldest' | 'price_asc' | 'price_desc' | 'most_liked';
 
 export interface ActiveFilters {
   stopTypes: StopType[];
+  categories: Category[];
   sort: SortOption;
 }
 
@@ -47,6 +49,17 @@ interface Props {
 export function FilterChips({ filters, onChange, resultCount }: Props) {
   const colors = useColors();
 
+  async function toggleCategory(cat: Category) {
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    const already = filters.categories.includes(cat);
+    onChange({
+      ...filters,
+      categories: already
+        ? filters.categories.filter(c => c !== cat)
+        : [...filters.categories, cat],
+    });
+  }
+
   async function toggleStopType(type: StopType) {
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     const already = filters.stopTypes.includes(type);
@@ -63,11 +76,14 @@ export function FilterChips({ filters, onChange, resultCount }: Props) {
     onChange({ ...filters, sort });
   }
 
-  const hasActiveFilters = filters.stopTypes.length > 0 || filters.sort !== 'newest';
+  const hasActiveFilters =
+    filters.categories.length > 0 ||
+    filters.stopTypes.length > 0 ||
+    filters.sort !== 'newest';
 
   async function clearAll() {
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    onChange({ stopTypes: [], sort: 'newest' });
+    onChange({ categories: [], stopTypes: [], sort: 'newest' });
   }
 
   return (
@@ -79,7 +95,7 @@ export function FilterChips({ filters, onChange, resultCount }: Props) {
       >
         {hasActiveFilters && (
           <TouchableOpacity
-            style={[styles.chip, styles.clearChip, { backgroundColor: colors.destructive + '18', borderColor: colors.destructive + '44' }]}
+            style={[styles.chip, { backgroundColor: colors.destructive + '18', borderColor: colors.destructive + '44' }]}
             onPress={clearAll}
             activeOpacity={0.75}
           >
@@ -90,6 +106,27 @@ export function FilterChips({ filters, onChange, resultCount }: Props) {
 
         <View style={[styles.separator, { backgroundColor: colors.border }]} />
 
+        {ALL_CATEGORIES.map(cat => {
+          const meta = CATEGORY_META[cat];
+          const active = filters.categories.includes(cat);
+          return (
+            <TouchableOpacity
+              key={cat}
+              style={[
+                styles.chip,
+                { backgroundColor: active ? meta.color : meta.bg, borderColor: active ? meta.color : meta.color + '55' },
+              ]}
+              onPress={() => toggleCategory(cat)}
+              activeOpacity={0.75}
+            >
+              <Feather name={meta.icon as any} size={12} color={active ? '#fff' : meta.color} />
+              <Text style={[styles.chipText, { color: active ? '#fff' : meta.color }]}>{meta.label}</Text>
+            </TouchableOpacity>
+          );
+        })}
+
+        <View style={[styles.separator, { backgroundColor: colors.border }]} />
+
         {STOP_TYPES.map(({ value, label, icon }) => {
           const active = filters.stopTypes.includes(value);
           const color = stopColor(value, colors);
@@ -97,13 +134,7 @@ export function FilterChips({ filters, onChange, resultCount }: Props) {
           return (
             <TouchableOpacity
               key={value}
-              style={[
-                styles.chip,
-                {
-                  backgroundColor: active ? color : bg,
-                  borderColor: active ? color : color + '44',
-                },
-              ]}
+              style={[styles.chip, { backgroundColor: active ? color : bg, borderColor: active ? color : color + '44' }]}
               onPress={() => toggleStopType(value)}
               activeOpacity={0.75}
             >
@@ -122,10 +153,7 @@ export function FilterChips({ filters, onChange, resultCount }: Props) {
               key={value}
               style={[
                 styles.chip,
-                {
-                  backgroundColor: active ? colors.primary : colors.secondary,
-                  borderColor: active ? colors.primary : colors.border,
-                },
+                { backgroundColor: active ? colors.primary : colors.secondary, borderColor: active ? colors.primary : colors.border },
               ]}
               onPress={() => setSort(value)}
               activeOpacity={0.75}
@@ -147,9 +175,7 @@ export function FilterChips({ filters, onChange, resultCount }: Props) {
 }
 
 const styles = StyleSheet.create({
-  wrapper: {
-    gap: 8,
-  },
+  wrapper: { gap: 8 },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -166,7 +192,6 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 1,
   },
-  clearChip: {},
   chipText: {
     fontSize: 12,
     fontFamily: 'Inter_500Medium',

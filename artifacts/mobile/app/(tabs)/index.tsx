@@ -3,33 +3,29 @@ import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import React, { useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
   FlatList,
   Platform,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
-  ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { FilterChips, ActiveFilters, SortOption } from '@/components/FilterChips';
+import { ActiveFilters, FilterChips } from '@/components/FilterChips';
 import { ItineraryCard } from '@/components/ItineraryCard';
 import { SearchBar } from '@/components/SearchBar';
 import { useItineraries } from '@/context/ItineraryContext';
 import { useColors } from '@/hooks/useColors';
 import { Itinerary } from '@/types/itinerary';
 
-const DEFAULT_FILTERS: ActiveFilters = { stopTypes: [], sort: 'newest' };
+const DEFAULT_FILTERS: ActiveFilters = { stopTypes: [], categories: [], sort: 'newest' };
 
 function totalPrice(it: Itinerary) {
   return it.basePrice + it.addOns.reduce((s, a) => s + a.price, 0);
 }
 
-function applyFiltersAndSort(
-  list: Itinerary[],
-  query: string,
-  filters: ActiveFilters,
-): Itinerary[] {
+function applyFiltersAndSort(list: Itinerary[], query: string, filters: ActiveFilters): Itinerary[] {
   let result = [...list];
 
   if (query.trim()) {
@@ -42,30 +38,24 @@ function applyFiltersAndSort(
     );
   }
 
+  if (filters.categories.length > 0) {
+    result = result.filter(it =>
+      filters.categories.some(cat => (it.categories ?? []).includes(cat)),
+    );
+  }
+
   if (filters.stopTypes.length > 0) {
     result = result.filter(it =>
-      filters.stopTypes.every(type =>
-        it.segments.some(seg => seg.stop.type === type),
-      ),
+      filters.stopTypes.every(type => it.segments.some(seg => seg.stop.type === type)),
     );
   }
 
   switch (filters.sort) {
-    case 'newest':
-      result.sort((a, b) => b.createdAt - a.createdAt);
-      break;
-    case 'oldest':
-      result.sort((a, b) => a.createdAt - b.createdAt);
-      break;
-    case 'price_asc':
-      result.sort((a, b) => totalPrice(a) - totalPrice(b));
-      break;
-    case 'price_desc':
-      result.sort((a, b) => totalPrice(b) - totalPrice(a));
-      break;
-    case 'most_liked':
-      result.sort((a, b) => b.thumbsUp - a.thumbsUp);
-      break;
+    case 'newest':    result.sort((a, b) => b.createdAt - a.createdAt); break;
+    case 'oldest':    result.sort((a, b) => a.createdAt - b.createdAt); break;
+    case 'price_asc': result.sort((a, b) => totalPrice(a) - totalPrice(b)); break;
+    case 'price_desc':result.sort((a, b) => totalPrice(b) - totalPrice(a)); break;
+    case 'most_liked':result.sort((a, b) => b.thumbsUp - a.thumbsUp); break;
   }
 
   return result;
@@ -85,27 +75,22 @@ export default function ItineraryListScreen() {
     [itineraries, query, filters],
   );
 
-  const isFiltering = query.trim().length > 0 || filters.stopTypes.length > 0 || filters.sort !== 'newest';
+  const isFiltering =
+    query.trim().length > 0 ||
+    filters.categories.length > 0 ||
+    filters.stopTypes.length > 0 ||
+    filters.sort !== 'newest';
 
   async function handleCreate() {
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     router.push('/create');
   }
 
-  function handleOpen(it: Itinerary) {
-    router.push(`/itinerary/${it.id}`);
-  }
-
   const topPad = Platform.OS === 'web' ? Math.max(insets.top, 67) : insets.top;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <View
-        style={[
-          styles.header,
-          { paddingTop: topPad + 16, backgroundColor: colors.background, borderBottomColor: colors.border },
-        ]}
-      >
+      <View style={[styles.header, { paddingTop: topPad + 16, backgroundColor: colors.background }]}>
         <View>
           <Text style={[styles.heading, { color: colors.foreground }]}>Itineraries</Text>
           <Text style={[styles.subheading, { color: colors.mutedForeground }]}>
@@ -161,7 +146,7 @@ export default function ItineraryListScreen() {
           data={filtered}
           keyExtractor={it => it.id}
           renderItem={({ item }) => (
-            <ItineraryCard itinerary={item} onPress={() => handleOpen(item)} />
+            <ItineraryCard itinerary={item} onPress={() => router.push(`/itinerary/${item.id}`)} />
           )}
           contentContainerStyle={[
             styles.list,
@@ -175,16 +160,13 @@ export default function ItineraryListScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
+  container: { flex: 1 },
   header: {
     flexDirection: 'row',
     alignItems: 'flex-end',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingBottom: 14,
-    borderBottomWidth: 0,
   },
   heading: {
     fontSize: 30,

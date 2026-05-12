@@ -1,7 +1,7 @@
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import {
   Alert,
   Platform,
@@ -18,16 +18,15 @@ import { PricingSection } from '@/components/PricingSection';
 import { EditableStopCard } from '@/components/StopCard';
 import { useItineraries } from '@/context/ItineraryContext';
 import { useColors } from '@/hooks/useColors';
-import { AddOn, Itinerary, ItinerarySegment, Transit } from '@/types/itinerary';
+import { AddOn, Category, ItinerarySegment, Transit } from '@/types/itinerary';
+import { ALL_CATEGORIES, CATEGORY_META } from '@/utils/categories';
 
 function genId() {
   return Date.now().toString() + Math.random().toString(36).substr(2, 9);
 }
 
 function blankSegment(): ItinerarySegment {
-  return {
-    stop: { id: genId(), type: 'sightseeing', name: '', duration: 60, notes: '' },
-  };
+  return { stop: { id: genId(), type: 'sightseeing', name: '', duration: 60, notes: '' } };
 }
 
 function blankTransit(): Transit {
@@ -48,8 +47,9 @@ export default function CreateScreen() {
   const [summary, setSummary] = useState(existing?.summary ?? '');
   const [details, setDetails] = useState(existing?.details ?? '');
   const [pictures, setPictures] = useState<string[]>(existing?.pictures ?? []);
+  const [categories, setCategories] = useState<Category[]>(existing?.categories ?? []);
   const [segments, setSegments] = useState<ItinerarySegment[]>(
-    existing?.segments.length ? existing.segments : [blankSegment()]
+    existing?.segments.length ? existing.segments : [blankSegment()],
   );
   const [basePrice, setBasePrice] = useState(existing?.basePrice ?? 0);
   const [addOns, setAddOns] = useState<AddOn[]>(existing?.addOns ?? []);
@@ -57,35 +57,40 @@ export default function CreateScreen() {
 
   const topPad = Platform.OS === 'web' ? Math.max(insets.top, 67) : insets.top;
 
-  function updateSegment(index: number, updated: ItinerarySegment) {
-    setSegments(prev => prev.map((s, i) => i === index ? updated : s));
+  function toggleCategory(cat: Category) {
+    setCategories(prev =>
+      prev.includes(cat) ? prev.filter(c => c !== cat) : [...prev, cat],
+    );
   }
 
-  function removeSegment(index: number) {
+  function updateSegment(i: number, updated: ItinerarySegment) {
+    setSegments(prev => prev.map((s, idx) => idx === i ? updated : s));
+  }
+
+  function removeSegment(i: number) {
     if (segments.length === 1) {
       Alert.alert('Cannot remove', 'An itinerary must have at least one stop.');
       return;
     }
-    setSegments(prev => prev.filter((_, i) => i !== index));
+    setSegments(prev => prev.filter((_, idx) => idx !== i));
   }
 
   function addSegment() {
-    const newSeg = blankSegment();
     setSegments(prev => {
       const copy = [...prev];
       if (copy.length > 0 && !copy[copy.length - 1].transitAfter) {
         copy[copy.length - 1] = { ...copy[copy.length - 1], transitAfter: blankTransit() };
       }
-      return [...copy, newSeg];
+      return [...copy, blankSegment()];
     });
   }
 
-  function addTransitAfter(index: number) {
-    setSegments(prev => prev.map((s, i) => i === index ? { ...s, transitAfter: blankTransit() } : s));
+  function addTransitAfter(i: number) {
+    setSegments(prev => prev.map((s, idx) => idx === i ? { ...s, transitAfter: blankTransit() } : s));
   }
 
-  function removeTransitAfter(index: number) {
-    setSegments(prev => prev.map((s, i) => i === index ? { ...s, transitAfter: undefined } : s));
+  function removeTransitAfter(i: number) {
+    setSegments(prev => prev.map((s, idx) => idx === i ? { ...s, transitAfter: undefined } : s));
   }
 
   async function handleSave() {
@@ -97,11 +102,24 @@ export default function CreateScreen() {
       Alert.alert('Summary required', 'Please enter a short summary.');
       return;
     }
+    if (categories.length === 0) {
+      Alert.alert('Category required', 'Please select at least one category.');
+      return;
+    }
 
     setSaving(true);
     await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
-    const data = { title: title.trim(), summary: summary.trim(), details: details.trim(), pictures, segments, basePrice, addOns };
+    const data = {
+      title: title.trim(),
+      summary: summary.trim(),
+      details: details.trim(),
+      pictures,
+      categories,
+      segments,
+      basePrice,
+      addOns,
+    };
 
     try {
       if (isEdit && editId) {
@@ -131,20 +149,18 @@ export default function CreateScreen() {
           activeOpacity={0.85}
         >
           <Text style={[styles.saveBtnText, { color: saving ? colors.mutedForeground : '#fff' }]}>
-            {saving ? 'Saving...' : 'Save'}
+            {saving ? 'Saving…' : 'Save'}
           </Text>
         </TouchableOpacity>
       </View>
 
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={[
-          styles.content,
-          { paddingBottom: (Platform.OS === 'web' ? 34 : insets.bottom) + 30 },
-        ]}
+        contentContainerStyle={[styles.content, { paddingBottom: (Platform.OS === 'web' ? 34 : insets.bottom) + 30 }]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
+        {/* Basic Info */}
         <View style={styles.section}>
           <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>Basic Info</Text>
           <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -188,6 +204,49 @@ export default function CreateScreen() {
           </View>
         </View>
 
+        {/* Categories */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeaderRow}>
+            <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>Category</Text>
+            <Text style={[styles.requiredHint, { color: categories.length === 0 ? colors.destructive : colors.mutedForeground }]}>
+              {categories.length === 0 ? 'Required — select at least one' : `${categories.length} selected`}
+            </Text>
+          </View>
+          <View style={[styles.categoryGrid, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            {ALL_CATEGORIES.map(cat => {
+              const meta = CATEGORY_META[cat];
+              const active = categories.includes(cat);
+              return (
+                <TouchableOpacity
+                  key={cat}
+                  style={[
+                    styles.categoryTile,
+                    {
+                      backgroundColor: active ? meta.color + '18' : colors.muted,
+                      borderColor: active ? meta.color : colors.border,
+                    },
+                  ]}
+                  onPress={() => toggleCategory(cat)}
+                  activeOpacity={0.8}
+                >
+                  <View style={[styles.catIconCircle, { backgroundColor: active ? meta.color : meta.bg }]}>
+                    <Feather name={meta.icon as any} size={18} color={active ? '#fff' : meta.color} />
+                  </View>
+                  <Text style={[styles.catTileLabel, { color: active ? meta.color : colors.foreground }]}>
+                    {meta.label}
+                  </Text>
+                  {active && (
+                    <View style={[styles.checkMark, { backgroundColor: meta.color }]}>
+                      <Feather name="check" size={10} color="#fff" />
+                    </View>
+                  )}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
+
+        {/* Photos */}
         <View style={styles.section}>
           <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>Photos</Text>
           <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border, padding: 14 }]}>
@@ -195,6 +254,7 @@ export default function CreateScreen() {
           </View>
         </View>
 
+        {/* Stops */}
         <View style={styles.section}>
           <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>
             Stops & Transit · {segments.length} stop{segments.length !== 1 ? 's' : ''}
@@ -223,6 +283,7 @@ export default function CreateScreen() {
           </View>
         </View>
 
+        {/* Pricing */}
         <View style={styles.section}>
           <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>Pricing</Text>
           <PricingSection
@@ -239,9 +300,7 @@ export default function CreateScreen() {
 }
 
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-  },
+  screen: { flex: 1 },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -263,22 +322,27 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: 'Inter_600SemiBold',
   },
-  scroll: {
-    flex: 1,
-  },
+  scroll: { flex: 1 },
   content: {
     padding: 16,
     gap: 20,
   },
-  section: {
-    gap: 10,
+  section: { gap: 10 },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 4,
   },
   sectionLabel: {
     fontSize: 13,
     fontFamily: 'Inter_500Medium',
     textTransform: 'uppercase',
     letterSpacing: 0.6,
-    paddingHorizontal: 4,
+  },
+  requiredHint: {
+    fontSize: 12,
+    fontFamily: 'Inter_400Regular',
   },
   card: {
     borderRadius: 14,
@@ -307,12 +371,47 @@ const styles = StyleSheet.create({
     minHeight: 80,
     textAlignVertical: 'top',
   },
-  divider: {
-    height: 1,
-  },
-  stopsContainer: {
+  divider: { height: 1 },
+  categoryGrid: {
+    flexDirection: 'row',
     gap: 10,
+    padding: 14,
+    borderRadius: 14,
+    borderWidth: 1,
   },
+  categoryTile: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 8,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    gap: 8,
+    position: 'relative',
+  },
+  catIconCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  catTileLabel: {
+    fontSize: 12,
+    fontFamily: 'Inter_600SemiBold',
+    textAlign: 'center',
+  },
+  checkMark: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stopsContainer: { gap: 10 },
   addStopBtn: {
     flexDirection: 'row',
     alignItems: 'center',

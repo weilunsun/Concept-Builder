@@ -33,6 +33,13 @@ const colors = {
     sightseeingBg: "#ECFDF5",
     business: "#3B82F6",
     businessBg: "#EFF6FF",
+
+    categoryPhotography: "#8B5CF6",
+    categoryPhotographyBg: "#F5F3FF",
+    categoryExperience: "#F97316",
+    categoryExperienceBg: "#FFF7ED",
+    categorySight: "#0EA5E9",
+    categorySightBg: "#F0F9FF",
   },
   radius: 12,
 };

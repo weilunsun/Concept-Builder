@@ -4,6 +4,7 @@ import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { Itinerary } from '@/types/itinerary';
+import { CATEGORY_META } from '@/utils/categories';
 
 interface Props {
   itinerary: Itinerary;
@@ -33,6 +34,7 @@ export function ItineraryCard({ itinerary, onPress }: Props) {
   const stops = itinerary.segments.length;
   const total = totalPrice(itinerary);
   const duration = formatDuration(itinerary.segments);
+  const cats = itinerary.categories ?? [];
 
   return (
     <TouchableOpacity
@@ -53,6 +55,20 @@ export function ItineraryCard({ itinerary, onPress }: Props) {
           <Text style={[styles.title, { color: colors.foreground }]} numberOfLines={1}>{itinerary.title}</Text>
           <Text style={[styles.price, { color: colors.primary }]}>${total.toLocaleString()}</Text>
         </View>
+
+        {cats.length > 0 && (
+          <View style={styles.categoryRow}>
+            {cats.map(cat => {
+              const meta = CATEGORY_META[cat];
+              return (
+                <View key={cat} style={[styles.catBadge, { backgroundColor: meta.bg, borderColor: meta.color + '55' }]}>
+                  <Feather name={meta.icon as any} size={10} color={meta.color} />
+                  <Text style={[styles.catText, { color: meta.color }]}>{meta.label}</Text>
+                </View>
+              );
+            })}
+          </View>
+        )}
 
         <Text style={[styles.summary, { color: colors.mutedForeground }]} numberOfLines={2}>
           {itinerary.summary}
@@ -95,7 +111,7 @@ const styles = StyleSheet.create({
   },
   imagePlaceholder: {
     width: '100%',
-    height: 120,
+    height: 110,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -117,6 +133,24 @@ const styles = StyleSheet.create({
   price: {
     fontSize: 16,
     fontFamily: 'Inter_700Bold',
+  },
+  categoryRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  catBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  catText: {
+    fontSize: 11,
+    fontFamily: 'Inter_500Medium',
   },
   summary: {
     fontSize: 13,

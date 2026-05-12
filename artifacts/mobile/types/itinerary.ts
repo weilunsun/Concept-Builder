@@ -1,5 +1,6 @@
 export type StopType = 'food' | 'sightseeing' | 'business';
 export type TransitMode = 'walking' | 'driving' | 'transit' | 'flight';
+export type Category = 'photography' | 'experience' | 'sight';
 
 export interface Stop {
   id: string;
@@ -33,6 +34,7 @@ export interface Itinerary {
   summary: string;
   details: string;
   pictures: string[];
+  categories: Category[];
   thumbsUp: number;
   thumbsDown: number;
   userVote: 'up' | 'down' | null;

@@ -21,6 +21,7 @@ import { ReviewBar } from '@/components/ReviewBar';
 import { ReadOnlyStopCard } from '@/components/StopCard';
 import { useItineraries } from '@/context/ItineraryContext';
 import { useColors } from '@/hooks/useColors';
+import { CATEGORY_META } from '@/utils/categories';
 
 const { width } = Dimensions.get('window');
 
@@ -119,6 +120,19 @@ export default function ItineraryDetailScreen() {
           <View style={styles.titleBlock}>
             <Text style={[styles.idBadge, { color: colors.mutedForeground }]}>#{itinerary.id.slice(-6).toUpperCase()}</Text>
             <Text style={[styles.title, { color: colors.foreground }]}>{itinerary.title}</Text>
+            {(itinerary.categories ?? []).length > 0 && (
+              <View style={styles.categoryRow}>
+                {(itinerary.categories ?? []).map(cat => {
+                  const meta = CATEGORY_META[cat];
+                  return (
+                    <View key={cat} style={[styles.catBadge, { backgroundColor: meta.bg, borderColor: meta.color + '55' }]}>
+                      <Feather name={meta.icon as any} size={12} color={meta.color} />
+                      <Text style={[styles.catText, { color: meta.color }]}>{meta.label}</Text>
+                    </View>
+                  );
+                })}
+              </View>
+            )}
           </View>
         </View>
 
@@ -236,6 +250,25 @@ const styles = StyleSheet.create({
     fontSize: 26,
     fontFamily: 'Inter_700Bold',
     lineHeight: 32,
+  },
+  categoryRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: 2,
+  },
+  catBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  catText: {
+    fontSize: 12,
+    fontFamily: 'Inter_500Medium',
   },
   section: {
     gap: 10,

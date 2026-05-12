@@ -1,8 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { ReactNode, createContext, useContext, useEffect, useState } from 'react';
-import { Itinerary, ItinerarySegment } from '@/types/itinerary';
+import { Itinerary } from '@/types/itinerary';
 
-const STORAGE_KEY = '@itineraries_v1';
+const STORAGE_KEY = '@itineraries_v2';
 
 function genId(): string {
   return Date.now().toString() + Math.random().toString(36).substr(2, 9);
@@ -15,6 +15,7 @@ const SAMPLES: Itinerary[] = [
     summary: 'A scenic drive along the California coast with stops at iconic landmarks and hidden coves.',
     details: 'This 3-day adventure takes you from San Francisco to Los Angeles along Highway 1. Experience dramatic cliff views, charming seaside towns, whale watching, and unforgettable Pacific sunsets. Best done in spring or fall to avoid crowds. Pack layers — coastal weather changes fast.',
     pictures: [],
+    categories: ['photography', 'sight'],
     thumbsUp: 24,
     thumbsDown: 2,
     userVote: null,
@@ -44,6 +45,7 @@ const SAMPLES: Itinerary[] = [
     summary: 'Five days exploring the highlights of Paris and Amsterdam with expert-curated stops.',
     details: 'A carefully crafted journey through two of Europe\'s most beloved cities. From the Eiffel Tower to the Anne Frank House, this itinerary balances iconic landmarks with local neighborhoods, exceptional cuisine, and cultural depth. Designed for first-timers and repeat visitors alike.',
     pictures: [],
+    categories: ['experience', 'sight'],
     thumbsUp: 41,
     thumbsDown: 5,
     userVote: 'up',
