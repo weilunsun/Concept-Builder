@@ -35,11 +35,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     (async () => {
       try {
         const storedProviders = await AsyncStorage.getItem(PROVIDERS_KEY);
-        let providers: Provider[] = storedProviders ? JSON.parse(storedProviders) : SEED_PROVIDERS;
+        let providers: Provider[] = storedProviders ? JSON.parse(storedProviders) : [];
         // Migrate legacy records missing role
         providers = providers.map(p => ({ ...p, role: p.role ?? 'provider' }));
-        if (!storedProviders) await AsyncStorage.setItem(PROVIDERS_KEY, JSON.stringify(SEED_PROVIDERS));
-        else await AsyncStorage.setItem(PROVIDERS_KEY, JSON.stringify(providers));
+        // Upsert any seed accounts that are missing (by id), so new seeds always appear
+        for (const seed of SEED_PROVIDERS) {
+          if (!providers.find(p => p.id === seed.id)) {
+            providers = [...providers, seed];
+          }
+        }
+        await AsyncStorage.setItem(PROVIDERS_KEY, JSON.stringify(providers));
         setAllProviders(providers);
 
         const session = await AsyncStorage.getItem(SESSION_KEY);
