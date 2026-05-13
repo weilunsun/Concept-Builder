@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { ReactNode, createContext, useContext, useEffect, useState } from 'react';
 import { Itinerary } from '@/types/itinerary';
 
-const STORAGE_KEY = '@itineraries_v3';
+const STORAGE_KEY = '@itineraries_v4';
 
 function genId(): string {
   return Date.now().toString() + Math.random().toString(36).substr(2, 9);
@@ -15,7 +15,11 @@ const SAMPLES: Itinerary[] = [
     title: 'Coastal Road Trip',
     summary: 'A scenic drive along the California coast with stops at iconic landmarks and hidden coves.',
     details: 'This 3-day adventure takes you from San Francisco to Los Angeles along Highway 1. Experience dramatic cliff views, charming seaside towns, whale watching, and unforgettable Pacific sunsets. Best done in spring or fall to avoid crowds. Pack layers — coastal weather changes fast.',
-    pictures: [],
+    pictures: [
+      'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=800&q=80',
+      'https://images.unsplash.com/photo-1519046904884-53103b34b206?w=800&q=80',
+      'https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?w=800&q=80',
+    ],
     categories: ['photography', 'sight'],
     thumbsUp: 24,
     thumbsDown: 2,
@@ -46,7 +50,10 @@ const SAMPLES: Itinerary[] = [
     title: 'European City Break',
     summary: 'Five days exploring the highlights of Paris and Amsterdam with expert-curated stops.',
     details: 'A carefully crafted journey through two of Europe\'s most beloved cities. From the Eiffel Tower to the Anne Frank House, this itinerary balances iconic landmarks with local neighborhoods, exceptional cuisine, and cultural depth. Designed for first-timers and repeat visitors alike.',
-    pictures: [],
+    pictures: [
+      'https://images.unsplash.com/photo-1499856871958-5b9627545d1a?w=800&q=80',
+      'https://images.unsplash.com/photo-1534351590666-13e3e96b5702?w=800&q=80',
+    ],
     categories: ['experience', 'sight'],
     thumbsUp: 41,
     thumbsDown: 5,

@@ -2,7 +2,7 @@ import { Feather } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { Image } from 'expo-image';
 import React from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 
 const MAX_PICTURES = 5;
@@ -18,14 +18,27 @@ export function PictureGallery({ pictures, editable = false, onChange }: Props) 
 
   async function pickImage() {
     if (pictures.length >= MAX_PICTURES) return;
+
+    if (Platform.OS !== 'web') {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') return;
+    }
+
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
-      quality: 0.8,
+      quality: 0.6,
       allowsEditing: true,
       aspect: [4, 3],
+      base64: true,
     });
+
     if (!result.canceled && result.assets[0]) {
-      onChange?.([...pictures, result.assets[0].uri]);
+      const asset = result.assets[0];
+      // Use base64 data URI so images survive reloads and AsyncStorage serialization
+      const uri = asset.base64
+        ? `data:image/jpeg;base64,${asset.base64}`
+        : asset.uri;
+      onChange?.([...pictures, uri]);
     }
   }
 
@@ -42,10 +55,19 @@ export function PictureGallery({ pictures, editable = false, onChange }: Props) 
           Photos {pictures.length}/{MAX_PICTURES}
         </Text>
       </View>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.scroll}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.scroll}
+      >
         {pictures.map((uri, i) => (
           <View key={i} style={styles.thumb}>
-            <Image source={{ uri }} style={styles.image} contentFit="cover" />
+            <Image
+              source={{ uri }}
+              style={styles.image}
+              contentFit="cover"
+              cachePolicy="memory-disk"
+            />
             {editable && (
               <TouchableOpacity
                 style={[styles.removeBtn, { backgroundColor: colors.destructive }]}
@@ -62,8 +84,10 @@ export function PictureGallery({ pictures, editable = false, onChange }: Props) 
             onPress={pickImage}
             activeOpacity={0.7}
           >
-            <Feather name="plus" size={22} color={colors.primary} />
-            <Text style={[styles.addText, { color: colors.primary }]}>Add</Text>
+            <Feather name="camera" size={20} color={colors.primary} />
+            <Text style={[styles.addText, { color: colors.primary }]}>
+              {pictures.length === 0 ? 'Add Photo' : 'Add'}
+            </Text>
           </TouchableOpacity>
         )}
       </ScrollView>
@@ -72,9 +96,7 @@ export function PictureGallery({ pictures, editable = false, onChange }: Props) 
 }
 
 const styles = StyleSheet.create({
-  wrapper: {
-    gap: 10,
-  },
+  wrapper: { gap: 10 },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -89,8 +111,8 @@ const styles = StyleSheet.create({
     paddingRight: 4,
   },
   thumb: {
-    width: 110,
-    height: 82,
+    width: 120,
+    height: 90,
     borderRadius: 10,
     overflow: 'hidden',
   },
@@ -102,21 +124,21 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 5,
     right: 5,
-    width: 18,
-    height: 18,
-    borderRadius: 9,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
   },
   addBtn: {
-    width: 80,
-    height: 82,
+    width: 90,
+    height: 90,
     borderRadius: 10,
     borderWidth: 1.5,
     borderStyle: 'dashed',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 4,
+    gap: 5,
   },
   addText: {
     fontSize: 11,
