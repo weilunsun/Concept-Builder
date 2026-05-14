@@ -20,8 +20,14 @@ import { ReviewBar } from '@/components/ReviewBar';
 import { ReadOnlyStopCard } from '@/components/StopCard';
 import { useAuth } from '@/context/AuthContext';
 import { useItineraries } from '@/context/ItineraryContext';
+import { useUserTrips } from '@/context/UserTripsContext';
 import { useColors } from '@/hooks/useColors';
+import { Itinerary } from '@/types/itinerary';
 import { CATEGORY_META } from '@/utils/categories';
+
+function totalPrice(it: Itinerary) {
+  return it.basePrice + it.addOns.reduce((s, a) => s + a.price, 0);
+}
 
 export default function ItineraryDetailScreen() {
   const colors = useColors();
@@ -30,9 +36,14 @@ export default function ItineraryDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { getItinerary, voteItinerary, deleteItinerary } = useItineraries();
   const { provider } = useAuth();
+  const { isSaved, isBooked, toggleSave, bookTrip, cancelBooking } = useUserTrips();
 
   const itinerary = getItinerary(id);
   const isOwner = !!provider && !!itinerary && itinerary.providerId === provider.id;
+  const isUser = provider?.role === 'user';
+
+  const saved = itinerary ? isSaved(itinerary.id) : false;
+  const booked = itinerary ? isBooked(itinerary.id) : false;
 
   if (!itinerary) {
     return (
@@ -69,17 +80,57 @@ export default function ItineraryDetailScreen() {
     router.push({ pathname: '/create', params: { editId: itinerary!.id } });
   }
 
-  const topPad = Platform.OS === 'web' ? Math.max(insets.top, 67) : insets.top;
-  const hasHeroPic = itinerary.pictures.length > 0;
+  async function handleToggleSave() {
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    await toggleSave(itinerary!.id);
+  }
 
-  // Find provider name for badge
-  const ownerBadge = isOwner ? 'You' : undefined;
+  async function handleBook() {
+    if (booked) {
+      Alert.alert('Cancel Booking', 'Remove this trip from your bookings?', [
+        { text: 'Keep it', style: 'cancel' },
+        {
+          text: 'Cancel Booking',
+          style: 'destructive',
+          onPress: async () => {
+            await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+            await cancelBooking(itinerary!.id);
+          },
+        },
+      ]);
+      return;
+    }
+
+    const price = totalPrice(itinerary!);
+    Alert.alert(
+      'Confirm Booking',
+      `Book "${itinerary!.title}" for $${price.toLocaleString()}?\n\nThis will appear in your Booked Trips.`,
+      [
+        { text: 'Not now', style: 'cancel' },
+        {
+          text: 'Book Trip',
+          onPress: async () => {
+            await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            await bookTrip(itinerary!.id);
+            Alert.alert('Booked!', 'Find it under My Trips → Booked in the menu.');
+          },
+        },
+      ],
+    );
+  }
+
+  const topPad = Platform.OS === 'web' ? Math.max(insets.top, 67) : insets.top;
+  const bottomPad = (Platform.OS === 'web' ? 34 : insets.bottom);
+  const hasHeroPic = itinerary.pictures.length > 0;
+  // Height of the sticky action bar for users
+  const ACTION_BAR_H = isUser ? 76 + bottomPad : 0;
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
+      {/* Nav bar */}
       {hasHeroPic ? (
         <View style={styles.heroContainer}>
-          <Image source={{ uri: itinerary.pictures[0] }} style={styles.hero} contentFit="cover" />
+          <Image source={{ uri: itinerary.pictures[0] }} style={styles.hero} contentFit="cover" cachePolicy="memory-disk" />
           <View style={[styles.heroOverlay, { paddingTop: topPad + 8 }]}>
             <TouchableOpacity style={styles.navBtn} onPress={() => router.back()} activeOpacity={0.8}>
               <Feather name="arrow-left" size={20} color="#fff" />
@@ -116,24 +167,34 @@ export default function ItineraryDetailScreen() {
 
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={[
-          styles.content,
-          { paddingBottom: (Platform.OS === 'web' ? 34 : insets.bottom) + 20 },
-        ]}
+        contentContainerStyle={[styles.content, { paddingBottom: ACTION_BAR_H + 8 }]}
         showsVerticalScrollIndicator={false}
       >
+        {/* Title block */}
         <View style={styles.titleBlock}>
           <View style={styles.titleTopRow}>
             <Text style={[styles.idBadge, { color: colors.mutedForeground }]}>#{itinerary.id.slice(-6).toUpperCase()}</Text>
             {isOwner ? (
-              <View style={[styles.ownerBadge, { backgroundColor: colors.primary + '18', borderColor: colors.primary + '44' }]}>
+              <View style={[styles.statusBadge, { backgroundColor: colors.primary + '18', borderColor: colors.primary + '44' }]}>
                 <Feather name="shield" size={11} color={colors.primary} />
-                <Text style={[styles.ownerBadgeText, { color: colors.primary }]}>Your listing</Text>
+                <Text style={[styles.statusBadgeText, { color: colors.primary }]}>Your listing</Text>
+              </View>
+            ) : booked ? (
+              <View style={[styles.statusBadge, { backgroundColor: '#10B981' + '18', borderColor: '#10B981' + '44' }]}>
+                <Feather name="check-circle" size={11} color="#10B981" />
+                <Text style={[styles.statusBadgeText, { color: '#10B981' }]}>Booked</Text>
+              </View>
+            ) : saved ? (
+              <View style={[styles.statusBadge, { backgroundColor: colors.accent + '18' ?? '#F4845F18', borderColor: colors.accent + '44' ?? '#F4845F44' }]}>
+                <Feather name="bookmark" size={11} color={colors.accent ?? '#F4845F'} />
+                <Text style={[styles.statusBadgeText, { color: colors.accent ?? '#F4845F' }]}>Saved</Text>
               </View>
             ) : (
-              <View style={[styles.ownerBadge, { backgroundColor: colors.muted, borderColor: colors.border }]}>
-                <Feather name="user" size={11} color={colors.mutedForeground} />
-                <Text style={[styles.ownerBadgeText, { color: colors.mutedForeground }]}>View only</Text>
+              <View style={[styles.statusBadge, { backgroundColor: colors.muted, borderColor: colors.border }]}>
+                <Feather name="map" size={11} color={colors.mutedForeground} />
+                <Text style={[styles.statusBadgeText, { color: colors.mutedForeground }]}>
+                  {isUser ? 'Available' : 'View only'}
+                </Text>
               </View>
             )}
           </View>
@@ -182,11 +243,60 @@ export default function ItineraryDetailScreen() {
           </View>
         )}
 
-        <PricingSection
-          basePrice={itinerary.basePrice}
-          addOns={itinerary.addOns}
-        />
+        <PricingSection basePrice={itinerary.basePrice} addOns={itinerary.addOns} />
       </ScrollView>
+
+      {/* Sticky action bar — users only */}
+      {isUser && (
+        <View
+          style={[
+            styles.actionBar,
+            {
+              backgroundColor: colors.card,
+              borderTopColor: colors.border,
+              paddingBottom: bottomPad + 12,
+            },
+          ]}
+        >
+          {/* Save toggle */}
+          <TouchableOpacity
+            style={[
+              styles.saveBtn,
+              {
+                backgroundColor: saved ? (colors.accent ?? '#F4845F') + '18' : colors.secondary,
+                borderColor: saved ? (colors.accent ?? '#F4845F') : colors.border,
+              },
+            ]}
+            onPress={handleToggleSave}
+            activeOpacity={0.8}
+            disabled={booked}
+          >
+            <Feather
+              name={saved ? 'bookmark' : 'bookmark'}
+              size={18}
+              color={saved ? (colors.accent ?? '#F4845F') : colors.mutedForeground}
+            />
+            <Text style={[styles.saveBtnText, { color: saved ? (colors.accent ?? '#F4845F') : colors.mutedForeground }]}>
+              {saved ? 'Saved' : 'Save'}
+            </Text>
+          </TouchableOpacity>
+
+          {/* Book button */}
+          <TouchableOpacity
+            style={[
+              styles.bookBtn,
+              { backgroundColor: booked ? '#10B981' : colors.primary },
+            ]}
+            onPress={handleBook}
+            activeOpacity={0.85}
+          >
+            <Feather name={booked ? 'check-circle' : 'calendar'} size={18} color="#fff" />
+            <Text style={styles.bookBtnText}>
+              {booked ? 'Booked ✓' : `Book Trip · $${totalPrice(itinerary).toLocaleString()}`}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </View>
   );
 }
@@ -213,90 +323,61 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
   },
   navBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 10,
+    width: 38, height: 38, borderRadius: 10,
     backgroundColor: 'rgba(0,0,0,0.35)',
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: 'center', justifyContent: 'center',
   },
-  iconBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  iconBtn: { width: 38, height: 38, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   heroActions: { flexDirection: 'row', gap: 8 },
   scroll: { flex: 1 },
   content: { padding: 16, gap: 14 },
   titleBlock: { gap: 5 },
-  titleTopRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+  titleTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  idBadge: { fontSize: 12, fontFamily: 'Inter_500Medium', letterSpacing: 1 },
+  statusBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingHorizontal: 9, paddingVertical: 3, borderRadius: 20, borderWidth: 1,
   },
-  idBadge: {
-    fontSize: 12,
-    fontFamily: 'Inter_500Medium',
-    letterSpacing: 1,
-  },
-  ownerBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 9,
-    paddingVertical: 3,
-    borderRadius: 20,
-    borderWidth: 1,
-  },
-  ownerBadgeText: {
-    fontSize: 11,
-    fontFamily: 'Inter_500Medium',
-  },
-  title: {
-    fontSize: 26,
-    fontFamily: 'Inter_700Bold',
-    lineHeight: 32,
-  },
-  categoryRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-    marginTop: 2,
-  },
+  statusBadgeText: { fontSize: 11, fontFamily: 'Inter_500Medium' },
+  title: { fontSize: 26, fontFamily: 'Inter_700Bold', lineHeight: 32 },
+  categoryRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 2 },
   catBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, borderWidth: 1,
+  },
+  catText: { fontSize: 12, fontFamily: 'Inter_500Medium' },
+  section: { gap: 10 },
+  sectionTitle: { fontSize: 13, fontFamily: 'Inter_500Medium', textTransform: 'uppercase', letterSpacing: 0.6 },
+  notFound: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
+  notFoundText: { fontSize: 16, fontFamily: 'Inter_500Medium' },
+  back: { fontSize: 15, fontFamily: 'Inter_600SemiBold' },
+  // Action bar
+  actionBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 20,
-    borderWidth: 1,
+    gap: 10,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    borderTopWidth: 1,
   },
-  catText: {
-    fontSize: 12,
-    fontFamily: 'Inter_500Medium',
+  saveBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderRadius: 14,
+    borderWidth: 1.5,
   },
-  section: { gap: 10 },
-  sectionTitle: {
-    fontSize: 13,
-    fontFamily: 'Inter_500Medium',
-    textTransform: 'uppercase',
-    letterSpacing: 0.6,
-  },
-  notFound: {
+  saveBtnText: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
+  bookBtn: {
     flex: 1,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 12,
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: 14,
   },
-  notFoundText: {
-    fontSize: 16,
-    fontFamily: 'Inter_500Medium',
-  },
-  back: {
-    fontSize: 15,
-    fontFamily: 'Inter_600SemiBold',
-  },
+  bookBtnText: { fontSize: 15, fontFamily: 'Inter_700Bold', color: '#fff' },
 });

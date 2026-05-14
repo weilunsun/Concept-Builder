@@ -16,6 +16,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@/context/AuthContext';
 import { useItineraries } from '@/context/ItineraryContext';
+import { useUserTrips } from '@/context/UserTripsContext';
 import { useColors } from '@/hooks/useColors';
 
 const DRAWER_WIDTH = Dimensions.get('window').width * 0.78;
@@ -43,12 +44,14 @@ export function HamburgerMenu({ onMyItineraries }: Props) {
   const insets = useSafeAreaInsets();
   const { provider, logout } = useAuth();
   const { itineraries } = useItineraries();
+  const { savedTrips, bookedTrips } = useUserTrips();
   const [open, setOpen] = useState(false);
 
   const slideAnim = useRef(new Animated.Value(-DRAWER_WIDTH)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
   const isProvider = provider?.role === 'provider';
+  const isUser = provider?.role === 'user';
   const myCount = isProvider
     ? itineraries.filter(it => it.providerId === provider!.id).length
     : 0;
@@ -80,7 +83,6 @@ export function HamburgerMenu({ onMyItineraries }: Props) {
   }
 
   const topPad = Platform.OS === 'web' ? Math.max(insets.top, 67) : insets.top;
-
   const roleColor = isProvider ? colors.primary : colors.mutedForeground;
   const roleBg = isProvider ? colors.primary + '18' : colors.muted;
   const roleLabel = isProvider ? 'Provider / Admin' : 'Viewer';
@@ -135,20 +137,22 @@ export function HamburgerMenu({ onMyItineraries }: Props) {
 
             <View style={[styles.divider, { backgroundColor: colors.border }]} />
 
-            {/* Stats — providers only */}
+            {/* Stats row — role dependent */}
             {isProvider && (
               <>
                 <View style={styles.statsRow}>
-                  <View style={[styles.statBox, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
-                    <Text style={[styles.statValue, { color: colors.primary }]}>{myCount}</Text>
-                    <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>My Trips</Text>
-                  </View>
-                  <View style={[styles.statBox, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
-                    <Text style={[styles.statValue, { color: colors.primary }]}>
-                      {provider ? Math.floor((Date.now() - provider.createdAt) / 86400000) : 0}
-                    </Text>
-                    <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>Days Active</Text>
-                  </View>
+                  <StatBox label="My Trips" value={myCount} colors={colors} />
+                  <StatBox label="Days Active" value={provider ? Math.floor((Date.now() - provider.createdAt) / 86400000) : 0} colors={colors} />
+                </View>
+                <View style={[styles.divider, { backgroundColor: colors.border }]} />
+              </>
+            )}
+
+            {isUser && (
+              <>
+                <View style={styles.statsRow}>
+                  <StatBox label="Booked" value={bookedTrips.length} colors={colors} />
+                  <StatBox label="Saved" value={savedTrips.length} colors={colors} />
                 </View>
                 <View style={[styles.divider, { backgroundColor: colors.border }]} />
               </>
@@ -156,15 +160,10 @@ export function HamburgerMenu({ onMyItineraries }: Props) {
 
             {/* Menu items */}
             <View style={styles.menuItems}>
-              {/* All users: browse */}
-              <MenuItem
-                icon="map"
-                label="All Itineraries"
-                colors={colors}
-                onPress={() => closeDrawer()}
-              />
+              {/* All roles: browse */}
+              <MenuItem icon="map" label="All Itineraries" colors={colors} onPress={() => closeDrawer()} />
 
-              {/* Providers only */}
+              {/* Provider only */}
               {isProvider && (
                 <>
                   <MenuItem
@@ -178,6 +177,26 @@ export function HamburgerMenu({ onMyItineraries }: Props) {
                     label="New Itinerary"
                     colors={colors}
                     onPress={() => closeDrawer(() => router.push('/create'))}
+                  />
+                </>
+              )}
+
+              {/* User only */}
+              {isUser && (
+                <>
+                  <MenuItem
+                    icon="check-circle"
+                    label="Booked Trips"
+                    badge={bookedTrips.length}
+                    colors={colors}
+                    onPress={() => closeDrawer(() => router.push('/my-trips'))}
+                  />
+                  <MenuItem
+                    icon="bookmark"
+                    label="Saved Trips"
+                    badge={savedTrips.length}
+                    colors={colors}
+                    onPress={() => closeDrawer(() => router.push('/my-trips'))}
                   />
                 </>
               )}
@@ -200,11 +219,21 @@ export function HamburgerMenu({ onMyItineraries }: Props) {
   );
 }
 
+function StatBox({ label, value, colors }: { label: string; value: number; colors: ReturnType<typeof useColors> }) {
+  return (
+    <View style={[styles.statBox, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
+      <Text style={[styles.statValue, { color: colors.primary }]}>{value}</Text>
+      <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>{label}</Text>
+    </View>
+  );
+}
+
 function MenuItem({
-  icon, label, colors, onPress,
+  icon, label, badge, colors, onPress,
 }: {
   icon: string;
   label: string;
+  badge?: number;
   colors: ReturnType<typeof useColors>;
   onPress: () => void;
 }) {
@@ -214,6 +243,11 @@ function MenuItem({
         <Feather name={icon as any} size={16} color={colors.primary} />
       </View>
       <Text style={[styles.menuItemText, { color: colors.foreground }]}>{label}</Text>
+      {badge !== undefined && badge > 0 && (
+        <View style={[styles.menuBadge, { backgroundColor: colors.primary }]}>
+          <Text style={styles.menuBadgeText}>{badge}</Text>
+        </View>
+      )}
       <Feather name="chevron-right" size={16} color={colors.mutedForeground} />
     </TouchableOpacity>
   );
@@ -221,15 +255,9 @@ function MenuItem({
 
 const styles = StyleSheet.create({
   modalRoot: { flex: 1, flexDirection: 'row' },
-  overlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.45)',
-  },
+  overlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.45)' },
   drawer: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    bottom: 0,
+    position: 'absolute', left: 0, top: 0, bottom: 0,
     paddingHorizontal: 20,
     shadowColor: '#000',
     shadowOffset: { width: 4, height: 0 },
@@ -244,14 +272,8 @@ const styles = StyleSheet.create({
   providerName: { fontSize: 20, fontFamily: 'Inter_700Bold' },
   providerEmail: { fontSize: 13, fontFamily: 'Inter_400Regular' },
   roleBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 20,
-    borderWidth: 1,
-    marginTop: 2,
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, borderWidth: 1, marginTop: 2,
   },
   roleBadgeText: { fontSize: 12, fontFamily: 'Inter_500Medium' },
   divider: { height: 1, marginVertical: 16 },
@@ -263,6 +285,8 @@ const styles = StyleSheet.create({
   menuItem: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 13, paddingHorizontal: 4 },
   menuIconWrap: { width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   menuItemText: { flex: 1, fontSize: 15, fontFamily: 'Inter_500Medium' },
+  menuBadge: { minWidth: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 6 },
+  menuBadgeText: { fontSize: 11, fontFamily: 'Inter_700Bold', color: '#fff' },
   spacer: { flex: 1 },
   signOutBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14, borderRadius: 12, borderWidth: 1 },
   signOutText: { fontSize: 15, fontFamily: 'Inter_600SemiBold' },
